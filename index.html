@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Okey Şot Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #2c3e50; color: #fff; text-align: center; padding: 20px; }
+        .container { max-width: 500px; margin: auto; background: #34495e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        h2 { margin-bottom: 20px; }
+        select, input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 5px; border: none; font-size: 16px; box-sizing: border-box; }
+        button { background: #27ae60; color: white; cursor: pointer; font-weight: bold; }
+        button:hover { background: #219a52; }
+        .player-row { display: flex; justify-content: space-between; align-items: center; background: #1a252f; padding: 10px; margin: 5px 0; border-radius: 5px; }
+        .score-box { font-size: 20px; font-weight: bold; color: #f1c40f; }
+        .leaderboard { margin-top: 20px; background: #e67e22; padding: 15px; border-radius: 5px; text-align: left; }
+        .leaderboard h3 { margin-top: 0; text-align: center; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🎴 Okey Şot Tracker</h2>
+
+    <!-- Giriş Ekranı -->
+    <div id="login-screen">
+        <p>Zəhmət olmasa öz oyunçu adınızı seçin:</p>
+        <select id="player-select">
+            <option value="Oyunçu 1">Oyunçu 1</option>
+            <option value="Oyunçu 2">Oyunçu 2</option>
+            <option value="Oyunçu 3">Oyunçu 3</option>
+            <option value="Oyunçu 4">Oyunçu 4</option>
+        </select>
+        <button onclick="joinGame()">Oyuna Başla</button>
+    </div>
+
+    <!-- Oyun Ekranı -->
+    <div id="game-screen" class="hidden">
+        <h3 id="welcome-msg"></h3>
+        
+        <!-- Xal Daxil Etmə (Yalnız özü üçün aktivdir) -->
+        <div style="background: #16a085; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+            <label>Yeni xalını əlavə et (məs: 20 və ya -10):</label>
+            <input type="number" id="score-input" placeholder="Xal daxil edin">
+            <button onclick="updateMyScore()">Xalı Yenilə</button>
+        </div>
+
+        <!-- Canlı Şot Cədvəli -->
+        <div id="scores-list">
+            <!-- Oyunçuların xalları bura gələcək -->
+        </div>
+
+        <!-- Canlı Liderlik (Yerlər) Cədvəli -->
+        <div class="leaderboard">
+            <h3>🏆 Cari Sıralama (Yerlər)</h3>
+            <ol id="leaderboard-list">
+                <!-- Yerlər avtomatik hesablanacaq -->
+            </ol>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Pulsuz anlıq sinxronizasiya üçün ümumi WebSocket serveri (Demo məqsədli)
+    const socket = new WebSocket('wss://echo.websocket.org'); // Real layihədə pulsuz bir Piesocket tətbiq edilə bilər
+    
+    let myName = "";
+    let gameState = {
+        "Oyunçu 1": 0,
+        "Oyunçu 2": 0,
+        "Oyunçu 3": 0,
+        "Oyunçu 4": 0
+    };
+
+    // WebSocket qoşulanda köhnə datanı yoxla (və ya simulyasiya et)
+    socket.onopen = () => {
+        console.log("Serverə bağlanıldı!");
+    };
+
+    socket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === "SCORE_UPDATE") {
+                gameState[data.player] = data.score;
+                renderBoard();
+            }
+        } catch (e) {
+            // Local test zamanı echo server eyni mesajı qaytarır
+            if(event.data.includes("SCORE_UPDATE")) {
+                 const data = JSON.parse(event.data);
+                 gameState[data.player] = data.score;
+                 renderBoard();
+            }
+        }
+    };
+
+    function joinGame() {
+        myName = document.getElementById("player-select").value;
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("game-screen").classList.remove("hidden");
+        document.getElementById("welcome-msg").innerText = "Siz: " + myName;
+        renderBoard();
+    }
+
+    function updateMyScore() {
+        let inputVal = parseInt(document.getElementById("score-input").value);
+        if (isNaN(inputVal)) return alert("Düzgün rəqəm daxil edin!");
+        
+        // Yeni xalı köhnə xalın üzərinə gəlirik
+        gameState[myName] += inputVal;
+        document.getElementById("score-input").value = "";
+
+        // Digər 3 nəfərin telefonuna göndəririk
+        const message = {
+            type: "SCORE_UPDATE",
+            player: myName,
+            score: gameState[myName]
+        };
+        
+        socket.send(JSON.stringify(message));
+        renderBoard(); // Öz ekranımızı yeniləyirik
+    }
+
+    function renderBoard() {
+        // Xalları göstərmək
+        const listDiv = document.getElementById("scores-list");
+        listDiv.innerHTML = "";
+        
+        for (let player in gameState) {
+            listDiv.innerHTML += `
+                <div class="player-row">
+                    <span>${player} ${player === myName ? '<b>(Siz)</b>' : ''}</span>
+                    <span class="score-box">${gameState[player]}</span>
+                </div>
+            `;
+        }
+
+        // Yerləri (Sıralamanı) hesablamaq (Okeydə ən az xalı olan 1-ci olur)
+        const leaderboardList = document.getElementById("leaderboard-list");
+        leaderboardList.innerHTML = "";
+
+        let sortedPlayers = Object.keys(gameState).map(key => {
+            return { name: key, score: gameState[key] };
+        });
+
+        // Okey oyununda qaydaya görə xalı EN AZ olan və ya mənfi olan qazanır (Azdan çoxa sıralama)
+        // Əgər sizdə tərsinədirsə b.score - a.score edin.
+        sortedPlayers.sort((a, b) => a.score - b.score); 
+
+        sortedPlayers.forEach((player, index) => {
+            leaderboardList.innerHTML += `<li>${player.name}: ${player.score} xal</li>`;
+        });
+    }
+</script>
+
+</body>
+</html>
