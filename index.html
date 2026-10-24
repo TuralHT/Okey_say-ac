@@ -62,8 +62,9 @@
 </div>
 
 <script>
-    // Pulsuz anlıq sinxronizasiya üçün ümumi WebSocket serveri (Demo məqsədli)
-    const socket = new WebSocket('wss://echo.websocket.org'); // Real layihədə pulsuz bir Piesocket tətbiq edilə bilər
+    // Tamamilə pulsuz və hər kəsin eyni otağa bağlanması üçün PieSocket demo serveri
+    // Sonundakı 'okey-oda-12345' hissəsini istəsəniz özünüzə məxsus gizli bir rəqəmlə dəyişə bilərsiniz
+    const socket = new WebSocket('wss://://piesocket.com');
     
     let myName = "";
     let gameState = {
@@ -73,9 +74,8 @@
         "Oyunçu 4": 0
     };
 
-    // WebSocket qoşulanda köhnə datanı yoxla (və ya simulyasiya et)
     socket.onopen = () => {
-        console.log("Serverə bağlanıldı!");
+        console.log("Otağa uğurla bağlanıldı!");
     };
 
     socket.onmessage = (event) => {
@@ -86,12 +86,7 @@
                 renderBoard();
             }
         } catch (e) {
-            // Local test zamanı echo server eyni mesajı qaytarır
-            if(event.data.includes("SCORE_UPDATE")) {
-                 const data = JSON.parse(event.data);
-                 gameState[data.player] = data.score;
-                 renderBoard();
-            }
+            console.error("Data oxunarkən xəta yarandı:", e);
         }
     };
 
@@ -107,11 +102,9 @@
         let inputVal = parseInt(document.getElementById("score-input").value);
         if (isNaN(inputVal)) return alert("Düzgün rəqəm daxil edin!");
         
-        // Yeni xalı köhnə xalın üzərinə gəlirik
         gameState[myName] += inputVal;
         document.getElementById("score-input").value = "";
 
-        // Digər 3 nəfərin telefonuna göndəririk
         const message = {
             type: "SCORE_UPDATE",
             player: myName,
@@ -119,11 +112,10 @@
         };
         
         socket.send(JSON.stringify(message));
-        renderBoard(); // Öz ekranımızı yeniləyirik
+        renderBoard(); 
     }
 
     function renderBoard() {
-        // Xalları göstərmək
         const listDiv = document.getElementById("scores-list");
         listDiv.innerHTML = "";
         
@@ -136,7 +128,6 @@
             `;
         }
 
-        // Yerləri (Sıralamanı) hesablamaq (Okeydə ən az xalı olan 1-ci olur)
         const leaderboardList = document.getElementById("leaderboard-list");
         leaderboardList.innerHTML = "";
 
@@ -144,12 +135,11 @@
             return { name: key, score: gameState[key] };
         });
 
-        // Okey oyununda qaydaya görə xalı EN AZ olan və ya mənfi olan qazanır (Azdan çoxa sıralama)
-        // Əgər sizdə tərsinədirsə b.score - a.score edin.
+        // Ən az xalı olan (cəzası az olan) 1-ci yer olur
         sortedPlayers.sort((a, b) => a.score - b.score); 
 
         sortedPlayers.forEach((player, index) => {
-            leaderboardList.innerHTML += `<li>${player.name}: ${player.score} xal</li>`;
+            leaderboardList.innerHTML += `<li>${index + 1}-ci Yer - ${player.name}: ${player.score} xal</li>`;
         });
     }
 </script>
